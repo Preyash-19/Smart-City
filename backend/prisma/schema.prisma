@@ -1,0 +1,126 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String      @id @default(uuid())
+  name          String
+  email         String      @unique
+  password      String
+  role          Role        @default(CITIZEN)
+  department    Department?
+  createdAt     DateTime    @default(now())
+  complaints    Complaint[] @relation("CitizenComplaints")
+  assignedTasks Complaint[] @relation("ContractorTasks")
+  feedbacks     Feedback[]
+  notifications Notification[]
+}
+
+model Complaint {
+  id                String          @id @default(uuid())
+  title             String
+  description       String
+  imageUrl          String
+  voiceUrl          String?
+  latitude          Float
+  longitude         Float
+  address           String
+  status            ComplaintStatus @default(SUBMITTED)
+  department        Department      @default(GENERAL)
+  priority          Priority        @default(MEDIUM)
+  aiCategory        String?
+  evidenceScore     Int             @default(0)
+  aiSummary         String?
+  isFake            Boolean         @default(false)
+  isDuplicate       Boolean         @default(false)
+  reportCount       Int             @default(1)
+  masterComplaintId String?
+  citizenId         String
+  contractorId      String?
+  completionImage   String?
+  completionRemark  String?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  citizen           User            @relation("CitizenComplaints", fields: [citizenId], references: [id])
+  contractor        User?           @relation("ContractorTasks", fields: [contractorId], references: [id])
+  masterComplaint   Complaint?      @relation("CommunityVerification", fields: [masterComplaintId], references: [id])
+  childComplaints   Complaint[]     @relation("CommunityVerification")
+  feedback          Feedback?
+  statusLogs        StatusLog[]
+  notifications     Notification[]
+}
+
+model StatusLog {
+  id          String          @id @default(uuid())
+  status      ComplaintStatus
+  remarks     String?
+  createdAt   DateTime        @default(now())
+  complaintId String
+  complaint   Complaint       @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+}
+
+model Notification {
+  id          String     @id @default(uuid())
+  userId      String
+  title       String
+  message     String
+  type        String     @default("STATUS_UPDATE")
+  complaintId String?
+  isRead      Boolean    @default(false)
+  createdAt   DateTime   @default(now())
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  complaint   Complaint? @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+}
+
+model Feedback {
+  id          String    @id @default(uuid())
+  rating      Int
+  comments    String?
+  createdAt   DateTime  @default(now())
+  complaintId String    @unique
+  userId      String
+  complaint   Complaint @relation(fields: [complaintId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+enum Role {
+  CITIZEN
+  OFFICER
+  CONTRACTOR
+  ADMIN
+}
+
+enum Department {
+  ROAD
+  SANITATION
+  WATER_SUPPLY
+  ELECTRICAL
+  DRAINAGE
+  TRAFFIC
+  GENERAL
+}
+
+enum ComplaintStatus {
+  SUBMITTED
+  AI_PROCESSING
+  ROUTED
+  OFFICER_REVIEW
+  CONTRACTOR_ASSIGNED
+  IN_PROGRESS
+  RESOLVED
+  COMPLETED
+  CLOSED
+  REJECTED
+  DUPLICATE
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+}
