@@ -15,16 +15,21 @@ __pycache__/
 .env*.local
 *.env
 
-# SQLite Database
+# SQLite Database & Backups
 *.db
 *.sqlite
 *.sqlite3
 *.db-journal
+backups/
+*/backups/
+*.payload.json
 
 # Build outputs
 dist/
 build/
 dist-ssr/
+dev-dist/
+*/dev-dist/
 
 # Logs
 logs/
@@ -40,3 +45,4 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 .idea/
+.neon

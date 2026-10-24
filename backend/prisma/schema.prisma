@@ -3,22 +3,30 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 model User {
-  id            String      @id @default(uuid())
-  name          String
-  email         String      @unique
-  password      String
-  role          Role        @default(CITIZEN)
-  department    Department?
-  createdAt     DateTime    @default(now())
-  complaints    Complaint[] @relation("CitizenComplaints")
-  assignedTasks Complaint[] @relation("ContractorTasks")
-  feedbacks     Feedback[]
-  notifications Notification[]
+  id                 String       @id @default(uuid())
+  name               String
+  email              String       @unique
+  password           String
+  role               Role         @default(CITIZEN)
+  department         Department?
+  departmentRole     String?      @default("OFFICER") // HEAD, OFFICER, STAFF
+  status             String       @default("ACTIVE")  // ACTIVE, INACTIVE, INVITED
+  invitationToken    String?      @unique
+  invitationExpires  DateTime?
+  lastLogin          DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @default(now()) @updatedAt
+  complaints         Complaint[]  @relation("CitizenComplaints")
+  assignedTasks      Complaint[]  @relation("ContractorTasks")
+  officerComplaints  Complaint[]  @relation("OfficerAssignments")
+  feedbacks          Feedback[]
+  notifications      Notification[]
 }
 
 model Complaint {
@@ -33,6 +41,22 @@ model Complaint {
   status            ComplaintStatus @default(SUBMITTED)
   department        Department      @default(GENERAL)
   priority          Priority        @default(MEDIUM)
+  severity          String?         @default("MEDIUM")
+  severityScore     Int?            @default(50)
+  confidence        Float?          @default(0.85)
+  civicRelevance    String?         @default("RELEVANT")
+  departmentMatch   String?         @default("MATCH")
+  verificationStatus String?        @default("PENDING")
+  aiPredictedDept   String?
+  aiPredictedIssue  String?
+  aiPredictedSeverity String?
+  aiExplanation     String?
+  aiExplanationHi   String?
+  aiExplanationMr   String?
+  severityReasons   String?
+  modelVersion      String?         @default("v2.1-civic-vision")
+  humanVerified     Boolean         @default(false)
+  humanRemarks      String?
   aiCategory        String?
   evidenceScore     Int             @default(0)
   aiSummary         String?
@@ -42,17 +66,31 @@ model Complaint {
   masterComplaintId String?
   citizenId         String
   contractorId      String?
+  assignedOfficerId String?
   completionImage   String?
   completionRemark  String?
+  idempotencyKey    String?         @unique
   createdAt         DateTime        @default(now())
   updatedAt         DateTime        @updatedAt
   citizen           User            @relation("CitizenComplaints", fields: [citizenId], references: [id])
   contractor        User?           @relation("ContractorTasks", fields: [contractorId], references: [id])
+  assignedOfficer   User?           @relation("OfficerAssignments", fields: [assignedOfficerId], references: [id])
   masterComplaint   Complaint?      @relation("CommunityVerification", fields: [masterComplaintId], references: [id])
   childComplaints   Complaint[]     @relation("CommunityVerification")
   feedback          Feedback?
   statusLogs        StatusLog[]
   notifications     Notification[]
+}
+
+model AuditLog {
+  id          String   @id @default(uuid())
+  action      String
+  details     String?
+  adminId     String?
+  adminName   String?
+  targetId    String?
+  targetEmail String?
+  createdAt   DateTime @default(now())
 }
 
 model StatusLog {
@@ -103,6 +141,7 @@ enum Department {
   DRAINAGE
   TRAFFIC
   GENERAL
+  OTHER
 }
 
 enum ComplaintStatus {
@@ -123,4 +162,5 @@ enum Priority {
   LOW
   MEDIUM
   HIGH
+  CRITICAL
 }

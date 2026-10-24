@@ -1,7 +1,22 @@
 import { useEffect, useState } from 'react';
-import axios from 'axios';
+import { apiClient } from '../services/api';
 import { useNavigate, Link } from 'react-router-dom';
-import { ArrowLeft, Clock, CheckCircle2, AlertCircle, LogOut, Star } from 'lucide-react';
+import { 
+  Clock, 
+  CheckCircle2, 
+  AlertCircle, 
+  Star, 
+  BrainCircuit, 
+  MapPin, 
+  ArrowLeft, 
+  LogOut, 
+  CheckCheck, 
+  X,
+  PlusCircle,
+  Eye
+} from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
+import { useToast } from '../context/ToastContext';
 
 interface FeedbackData {
   id: string;
@@ -14,15 +29,41 @@ interface Complaint {
   id: string;
   title: string;
   description: string;
+  imageUrl?: string;
+  department: string;
   status: string;
   createdAt: string;
+  latitude?: number;
+  longitude?: number;
+  address?: string;
+  severity?: string;
+  severityScore?: number;
+  evidenceScore?: number;
+  confidence?: number;
+  civicRelevance?: string;
+  departmentMatch?: string;
+  verificationStatus?: string;
+  aiPredictedDept?: string;
+  aiPredictedIssue?: string;
+  aiExplanation?: string;
+  aiExplanationHi?: string;
+  aiExplanationMr?: string;
+  severityReasons?: string;
+  humanVerified?: boolean;
+  humanRemarks?: string;
   feedback?: FeedbackData | null;
 }
 
 export default function CitizenHistory() {
+  const { language, t, formatDate } = useLanguage();
+  const { showToast } = useToast();
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('ALL');
+
+  // Image lightbox preview
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Feedback form state
   const [activeFeedbackId, setActiveFeedbackId] = useState<string | null>(null);
@@ -47,13 +88,13 @@ export default function CitizenHistory() {
         return;
       }
 
-      const response = await axios.get('http://localhost:5000/api/complaints/my-history', {
+      const response = await apiClient.get('/complaints/my-history', {
         headers: { Authorization: `Bearer ${token}` }
       });
 
       setComplaints(response.data.complaints || []);
     } catch (err) {
-      setError('Failed to load your history.');
+      setError(t.complaintForm.submitNetworkError);
     } finally {
       setLoading(false);
     }
@@ -83,9 +124,8 @@ export default function CitizenHistory() {
   };
 
   const handleSubmitFeedback = async (complaintId: string) => {
-    // 1. Validation: Rating required and must be 1 to 5
     if (!rating || rating < 1 || rating > 5) {
-      setFeedbackError('Please select a rating between 1 and 5 stars before submitting.');
+      setFeedbackError(t.citizenHistory.starRatingPrompt);
       return;
     }
 
@@ -99,8 +139,8 @@ export default function CitizenHistory() {
         return;
       }
 
-      const response = await axios.post(
-        `http://localhost:5000/api/complaints/${complaintId}/feedback`,
+      const response = await apiClient.post(
+        `/complaints/${complaintId}/feedback`,
         {
           rating,
           comment: comment.trim() || undefined
@@ -110,255 +150,456 @@ export default function CitizenHistory() {
         }
       );
 
-      const savedFeedback = response.data.feedback;
-
-      // Update local complaint with new feedback
-      setComplaints((prev) =>
-        prev.map((c) =>
-          c.id === complaintId
-            ? { ...c, feedback: savedFeedback }
-            : c
-        )
-      );
+      setComplaints(prev => prev.map(c => {
+        if (c.id === complaintId) {
+          return {
+            ...c,
+            feedback: response.data.feedback
+          };
+        }
+        return c;
+      }));
 
       setSuccessFeedbackId(complaintId);
-      setActiveFeedbackId(null);
+      showToast(t.citizenHistory.feedbackSubmitted, 'success');
+      closeFeedbackForm();
+
     } catch (err: any) {
-      if (err.response?.status === 409) {
-        setFeedbackError('Feedback has already been submitted for this complaint.');
-      } else if (err.response?.data?.error) {
-        setFeedbackError(err.response.data.error);
-      } else {
-        setFeedbackError('Failed to submit feedback. Please try again.');
-      }
+      const errMsg = err.response?.data?.error || 'Failed to submit feedback.';
+      setFeedbackError(errMsg);
+      showToast(errMsg, 'error');
     } finally {
       setSubmittingFeedback(false);
     }
   };
 
-  const getStatusDisplay = (status: string) => {
+  const getStatusDisplay = (status: string, relevance?: string) => {
+    if (status === 'REJECTED' || relevance === 'IRRELEVANT') {
+      return {
+        text: 'Non-Civic Media — Rejected',
+        color: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/30',
+        icon: <AlertCircle className="w-3.5 h-3.5" />
+      };
+    }
     switch (status) {
-      case 'RESOLVED': 
-        return { color: 'text-green-500 dark:text-green-400 bg-green-500/10 border-green-500/30', icon: <CheckCircle2 className="w-4 h-4" />, text: 'Resolved' };
-      case 'IN_PROGRESS': 
-        return { color: 'text-amber-500 dark:text-amber-400 bg-amber-500/10 border-amber-500/30', icon: <Clock className="w-4 h-4" />, text: 'In Progress' };
-      default: 
-        return { color: 'text-slate-500 dark:text-slate-400 bg-slate-500/10 border-slate-500/30', icon: <AlertCircle className="w-4 h-4" />, text: 'Routed to AI' };
+      case 'SUBMITTED':
+      case 'ROUTED':
+        return {
+          text: t.statuses.ROUTED,
+          color: 'bg-cyan-500/10 text-cyan-600 dark:text-neonCyan border-cyan-500/30',
+          icon: <Clock className="w-3.5 h-3.5" />
+        };
+      case 'IN_PROGRESS':
+        return {
+          text: t.statuses.IN_PROGRESS,
+          color: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30',
+          icon: <AlertCircle className="w-3.5 h-3.5 animate-pulse" />
+        };
+      case 'RESOLVED':
+      case 'COMPLETED':
+      case 'CLOSED':
+        return {
+          text: t.statuses.RESOLVED,
+          color: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30',
+          icon: <CheckCircle2 className="w-3.5 h-3.5" />
+        };
+      case 'DUPLICATE':
+        return {
+          text: t.statuses.DUPLICATE,
+          color: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/30',
+          icon: <AlertCircle className="w-3.5 h-3.5" />
+        };
+      default:
+        return {
+          text: status,
+          color: 'bg-slate-500/10 text-slate-600 dark:text-slate-400 border-slate-500/30',
+          icon: <Clock className="w-3.5 h-3.5" />
+        };
     }
   };
+
+  const getSeverityBadge = (severity?: string, relevance?: string) => {
+    if (relevance === 'IRRELEVANT' || severity === 'REJECTED_AS_IRRELEVANT') {
+      return 'bg-slate-500/10 text-slate-500 border-slate-500/20';
+    }
+    switch (severity) {
+      case 'CRITICAL':
+      case 'HIGH':
+        return 'bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30 font-bold';
+      case 'MEDIUM':
+        return 'bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30 font-semibold';
+      case 'LOW':
+      default:
+        return 'bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30 font-medium';
+    }
+  };
+
+  const getLocalizedAiExplanation = (complaint: Complaint) => {
+    if (language === 'hi' && complaint.aiExplanationHi) {
+      return complaint.aiExplanationHi;
+    }
+    if (language === 'mr' && complaint.aiExplanationMr) {
+      return complaint.aiExplanationMr;
+    }
+    return complaint.aiExplanation || complaint.description;
+  };
+
+  const filteredComplaints = complaints.filter(c => {
+    if (filterStatus === 'ALL') return true;
+    if (filterStatus === 'RESOLVED') return c.status === 'RESOLVED' || c.status === 'COMPLETED' || c.status === 'CLOSED';
+    if (filterStatus === 'ACTIVE') return c.status === 'IN_PROGRESS' || c.status === 'ROUTED' || c.status === 'SUBMITTED';
+    if (filterStatus === 'REJECTED') return c.status === 'REJECTED' || c.civicRelevance === 'IRRELEVANT';
+    return c.status === filterStatus;
+  });
 
   return (
     <div className="w-full max-w-4xl p-4 sm:p-6 transition-colors">
       
-      {/* Navigation Bar */}
-      <div className="flex justify-between items-center mb-6 sm:mb-8 bg-white dark:bg-slate-900/60 backdrop-blur-lg border border-slate-200 dark:border-slate-700 p-4 rounded-2xl shadow-sm dark:shadow-xl">
-        <Link to="/citizen/report" className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-neonCyan transition-colors">
-          <ArrowLeft className="w-4 h-4 sm:w-5 sm:h-5" />
-          Report Another Issue
+      {/* Navigation Header */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-6 pb-4 border-b border-slate-200 dark:border-slate-800">
+        <Link 
+          to="/citizen" 
+          className="flex items-center gap-2 text-sm font-bold text-cyan-600 dark:text-neonCyan hover:underline transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          <span>{t.citizenHistory.backBtn}</span>
         </Link>
-        <button onClick={handleLogout} className="flex items-center gap-2 text-xs sm:text-sm font-semibold text-slate-600 dark:text-slate-400 hover:text-red-500 transition-colors">
-          <LogOut className="w-4 h-4 sm:w-5 sm:h-5" />
-          Log Out
-        </button>
+        <div className="flex items-center gap-3 self-end sm:self-auto">
+          <Link
+            to="/citizen/report"
+            className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 dark:bg-neonCyan dark:hover:bg-cyan-400 text-white dark:text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-all flex items-center gap-1.5 cursor-pointer"
+          >
+            <PlusCircle className="w-3.5 h-3.5" />
+            <span>{t.citizenHistory.reportNewBtn}</span>
+          </Link>
+          <button 
+            type="button"
+            onClick={handleLogout} 
+            className="flex items-center gap-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400 hover:text-red-500 transition-colors cursor-pointer"
+          >
+            <LogOut className="w-4 h-4" />
+            <span>{t.logOut}</span>
+          </button>
+        </div>
       </div>
 
-      <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 dark:text-white mb-6">My Report History</h2>
+      {/* Title & Filter Tabs */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h2 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tight">
+            {t.citizenHistory.title}
+          </h2>
+          <p className="text-slate-500 dark:text-slate-400 text-xs sm:text-sm mt-0.5">
+            {t.citizenHistory.subtitle}
+          </p>
+        </div>
+
+        {/* Status Filter Tabs */}
+        <div className="flex items-center gap-1 p-1 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl text-xs font-bold self-start sm:self-auto">
+          <button
+            type="button"
+            onClick={() => setFilterStatus('ALL')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              filterStatus === 'ALL'
+                ? 'bg-white dark:bg-slate-800 text-slate-900 dark:text-white shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            All ({complaints.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('ACTIVE')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              filterStatus === 'ACTIVE'
+                ? 'bg-white dark:bg-slate-800 text-amber-600 dark:text-amber-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Active
+          </button>
+          <button
+            type="button"
+            onClick={() => setFilterStatus('RESOLVED')}
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              filterStatus === 'RESOLVED'
+                ? 'bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+            }`}
+          >
+            Resolved
+          </button>
+        </div>
+      </div>
 
       {loading ? (
-        <div className="text-slate-500 dark:text-slate-400 animate-pulse text-sm">Loading your history...</div>
+        <div className="p-16 text-center text-slate-500 dark:text-slate-400 text-sm">
+          {t.loading}
+        </div>
       ) : error ? (
-        <div className="text-red-500 dark:text-red-400 text-sm p-4 bg-red-500/10 border border-red-500/30 rounded-xl">{error}</div>
-      ) : complaints.length === 0 ? (
-        <div className="p-8 text-center bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 rounded-2xl text-slate-500 dark:text-slate-400 text-sm">
-          You haven't submitted any reports yet.
+        <div className="text-red-600 dark:text-red-400 text-sm p-4 bg-red-500/10 border border-red-500/30 rounded-2xl">
+          {error}
+        </div>
+      ) : filteredComplaints.length === 0 ? (
+        <div className="p-12 text-center bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-3xl text-slate-500 dark:text-slate-400">
+          <p className="font-bold text-base mb-1 text-slate-800 dark:text-slate-200">{t.citizenHistory.emptyTitle}</p>
+          <p className="text-xs mb-5 max-w-sm mx-auto">{t.citizenHistory.emptySubtitle}</p>
+          <Link
+            to="/citizen/report"
+            className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-cyan-600 hover:bg-cyan-500 dark:bg-neonCyan dark:hover:bg-cyan-400 text-white dark:text-slate-950 font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+          >
+            <PlusCircle className="w-4 h-4" />
+            <span>{t.citizenHistory.reportNewBtn}</span>
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
-          {complaints.map((complaint) => {
-            const statusStyle = getStatusDisplay(complaint.status);
-            const isResolved = complaint.status === 'RESOLVED';
+          {filteredComplaints.map((complaint) => {
+            const statusStyle = getStatusDisplay(complaint.status, complaint.civicRelevance);
+            const isResolved = complaint.status === 'RESOLVED' || complaint.status === 'COMPLETED';
+            const isRejected = complaint.status === 'REJECTED' || complaint.civicRelevance === 'IRRELEVANT';
             const hasFeedback = Boolean(complaint.feedback);
             const isFormOpen = activeFeedbackId === complaint.id;
             const isJustSubmitted = successFeedbackId === complaint.id;
+            const severity = complaint.severity || 'MEDIUM';
+            const severityText = t.severities[severity as keyof typeof t.severities] || severity;
+            const deptText = t.departments[complaint.department as keyof typeof t.departments] || complaint.department;
+            const aiText = getLocalizedAiExplanation(complaint);
 
             return (
               <div 
                 key={complaint.id} 
-                className="p-4 sm:p-5 bg-white dark:bg-slate-900/60 backdrop-blur-md border border-slate-200 dark:border-slate-700 rounded-xl hover:border-slate-300 dark:hover:border-slate-500 shadow-sm dark:shadow-md transition-all"
+                className="p-5 bg-white dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 rounded-3xl hover:border-slate-300 dark:hover:border-slate-700 shadow-sm transition-all"
               >
-                {/* Header Row: Title & Status */}
-                <div className="flex flex-col sm:flex-row justify-between sm:items-start gap-3">
-                  <div className="flex-1">
-                    <span className="text-[11px] font-bold text-cyan-600 dark:text-cyan-400 uppercase tracking-wider block mb-1">
-                      Complaint #{complaint.id.slice(0, 8).toUpperCase()}
-                    </span>
-                    <h3 className="text-base sm:text-lg font-bold text-slate-900 dark:text-white mb-1">{complaint.title}</h3>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{complaint.description}</p>
-                    <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-500 mt-2 block">
-                      Submitted on: {new Date(complaint.createdAt).toLocaleDateString()}
-                    </span>
-                  </div>
+                <div className="flex flex-col sm:flex-row items-start gap-4">
                   
-                  <div className={`px-3 sm:px-4 py-1.5 sm:py-2 border rounded-lg flex items-center gap-2 font-bold text-xs sm:text-sm whitespace-nowrap self-start ${statusStyle.color}`}>
-                    {statusStyle.icon}
-                    {statusStyle.text}
-                  </div>
-                </div>
-
-                {/* Just Submitted Success Banner */}
-                {isJustSubmitted && (
-                  <div className="mt-4 p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-start gap-3 text-left animate-in fade-in duration-300">
-                    <CheckCircle2 className="w-5 h-5 text-emerald-500 shrink-0 mt-0.5" />
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-emerald-600 dark:text-emerald-400">
-                        ✓ Feedback submitted
-                      </h4>
-                      <p className="text-xs text-slate-600 dark:text-slate-300 mt-0.5">
-                        Thank you for helping us improve our civic services.
-                      </p>
+                  {/* Photo Evidence Thumbnail (if present) */}
+                  {complaint.imageUrl && (
+                    <div 
+                      onClick={() => setPreviewImage(complaint.imageUrl || null)}
+                      className="relative w-full sm:w-28 h-28 rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-slate-950 shrink-0 group cursor-pointer shadow-xs"
+                      title="Click to view full photo evidence"
+                    >
+                      <img 
+                        src={complaint.imageUrl} 
+                        alt="Complaint evidence" 
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200" 
+                      />
+                      <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white">
+                        <Eye className="w-5 h-5" />
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* RESOLVED CASE 1: Feedback already submitted (Read-Only) */}
-                {isResolved && hasFeedback && (
-                  <div className="mt-4 pt-3.5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/40 p-3.5 rounded-xl flex flex-col gap-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Your Feedback</span>
-                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
-                        <CheckCircle2 className="w-3 h-3" />
-                        Feedback submitted
+                  {/* Complaint Details */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                      <span className="text-[11px] font-mono font-bold text-cyan-600 dark:text-neonCyan uppercase tracking-wider">
+                        #{complaint.id.slice(0, 8).toUpperCase()}
                       </span>
-                    </div>
 
-                    <div className="flex items-center gap-1">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Star
-                          key={star}
-                          className={`w-4 h-4 ${
-                            star <= (complaint.feedback?.rating || 0)
-                              ? 'text-amber-400 fill-amber-400'
-                              : 'text-slate-300 dark:text-slate-700'
-                          }`}
-                        />
-                      ))}
-                      <span className="text-xs font-bold text-amber-500 ml-1.5">
-                        {complaint.feedback?.rating} / 5
+                      <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200 dark:border-slate-700">
+                        {deptText}
                       </span>
+
+                      {!isRejected && (
+                        <span className={`text-[11px] px-2.5 py-0.5 rounded-full border ${getSeverityBadge(severity, complaint.civicRelevance)}`}>
+                          {t.citizenHistory.severityLabel} {severityText}
+                        </span>
+                      )}
+
+                      {complaint.humanVerified && (
+                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                          <CheckCheck className="w-3 h-3" />
+                          <span>{t.verification.HUMAN_VERIFIED}</span>
+                        </span>
+                      )}
+
+                      <div className={`ml-auto px-2.5 py-1 rounded-full border flex items-center gap-1 text-[11px] font-bold ${statusStyle.color}`}>
+                        {statusStyle.icon}
+                        <span>{statusStyle.text}</span>
+                      </div>
                     </div>
 
-                    {complaint.feedback?.comments && (
-                      <p className="text-xs text-slate-700 dark:text-slate-300 italic bg-white dark:bg-slate-900/60 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
-                        "{complaint.feedback.comments}"
+                    <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1">
+                      {complaint.title || deptText}
+                    </h3>
+
+                    {complaint.address && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-2 flex items-center gap-1.5">
+                        <MapPin className="w-3.5 h-3.5 text-cyan-600 dark:text-neonCyan shrink-0" />
+                        <span className="truncate">{complaint.address}</span>
                       </p>
                     )}
-                  </div>
-                )}
 
-                {/* RESOLVED CASE 2: Resolved, no feedback submitted yet */}
-                {isResolved && !hasFeedback && !isFormOpen && (
-                  <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-end">
-                    <button
-                      onClick={() => openFeedbackForm(complaint.id)}
-                      className="px-3.5 py-1.5 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white text-xs font-semibold rounded-lg shadow-sm flex items-center gap-1.5 transition-all hover:scale-[1.02] active:scale-[0.98]"
-                    >
-                      <Star className="w-3.5 h-3.5" />
-                      Give Feedback
-                    </button>
-                  </div>
-                )}
+                    <span className="text-[11px] text-slate-400 dark:text-slate-500 block mb-3">
+                      {t.citizenDashboard.reportedOn}: {formatDate(complaint.createdAt)}
+                    </span>
 
-                {/* RESOLVED CASE 3: Active Feedback Form */}
-                {isResolved && !hasFeedback && isFormOpen && (
-                  <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-4 rounded-xl space-y-3.5">
-                    <div>
-                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
-                        Was your issue resolved?
-                      </h4>
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
-                        Select a star rating to help us gauge service quality.
-                      </p>
-                    </div>
-
-                    {/* Interactive Star Rating Selector */}
-                    <div>
-                      <div className="flex items-center gap-1.5">
-                        {[1, 2, 3, 4, 5].map((star) => (
-                          <button
-                            key={star}
-                            type="button"
-                            onClick={() => {
-                              setRating(star);
-                              setFeedbackError('');
-                            }}
-                            onMouseEnter={() => setHoverRating(star)}
-                            onMouseLeave={() => setHoverRating(0)}
-                            className="p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-cyan-500/50 transition-transform active:scale-95"
-                            aria-label={`${star} star${star > 1 ? 's' : ''}`}
-                          >
-                            <Star
-                              className={`w-7 h-7 sm:w-8 sm:h-8 transition-colors ${
-                                star <= (hoverRating || rating)
-                                  ? 'text-amber-400 fill-amber-400'
-                                  : 'text-slate-300 dark:text-slate-600 hover:text-amber-300'
-                              }`}
-                            />
-                          </button>
-                        ))}
-                        {rating > 0 && (
-                          <span className="text-xs font-bold text-amber-500 ml-2">
-                            {rating} {rating === 1 ? 'star' : 'stars'}
+                    {/* AI Visual Diagnostics Block */}
+                    <div className="p-3 bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800/80 rounded-2xl space-y-1.5">
+                      <div className="flex items-center justify-between text-xs font-bold text-cyan-700 dark:text-cyan-400">
+                        <span className="flex items-center gap-1.5">
+                          <BrainCircuit className="w-3.5 h-3.5" />
+                          <span>{t.citizenHistory.aiDiagnosisTitle}</span>
+                        </span>
+                        {complaint.confidence !== undefined && (
+                          <span className="text-[10px] font-mono text-slate-500 dark:text-slate-400">
+                            {(complaint.confidence * 100).toFixed(0)}% Confidence
                           </span>
                         )}
                       </div>
-                    </div>
 
-                    {/* Optional Comment Input */}
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">
-                        Your feedback <span className="text-slate-400 dark:text-slate-500 font-normal">(optional)</span>
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={comment}
-                        onChange={(e) => setComment(e.target.value)}
-                        placeholder="Tell us about your experience..."
-                        className="w-full text-xs sm:text-sm p-3 rounded-lg bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-white placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-cyan-500 resize-none transition-colors"
-                      />
-                    </div>
+                      <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed font-medium">
+                        {aiText}
+                      </p>
 
-                    {/* Error Banner */}
-                    {feedbackError && (
-                      <div className="p-2.5 bg-red-500/10 border border-red-500/30 rounded-lg text-red-600 dark:text-red-400 text-xs flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 shrink-0" />
-                        <span>{feedbackError}</span>
-                      </div>
-                    )}
-
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="button"
-                        disabled={submittingFeedback}
-                        onClick={() => handleSubmitFeedback(complaint.id)}
-                        className="px-4 py-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 disabled:opacity-50 text-white text-xs font-bold rounded-lg shadow-sm flex items-center gap-2 transition-all hover:scale-[1.01] active:scale-[0.98]"
-                      >
-                        {submittingFeedback ? 'Submitting...' : 'Submit Feedback'}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={submittingFeedback}
-                        onClick={closeFeedbackForm}
-                        className="px-3 py-2 text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-                      >
-                        Cancel
-                      </button>
+                      {complaint.humanRemarks && (
+                        <div className="pt-2 text-xs text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 p-2 rounded-xl border border-emerald-500/20">
+                          <strong>{t.citizenHistory.officerRemarksTitle}</strong> {complaint.humanRemarks}
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
+
+                {/* Just Submitted Feedback Success Banner */}
+                {isJustSubmitted && (
+                  <div className="mt-4 p-3 bg-emerald-500/10 border border-emerald-500/30 rounded-xl flex items-center gap-2 text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    <CheckCircle2 className="w-4 h-4 shrink-0" />
+                    <span>{t.citizenHistory.feedbackSubmitted}</span>
+                  </div>
                 )}
+
+                {/* Read-Only Feedback Display if already submitted */}
+                {isResolved && hasFeedback && (
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-slate-600 dark:text-slate-400">Your Feedback:</span>
+                      <div className="flex items-center gap-1">
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Star
+                            key={star}
+                            className={`w-3.5 h-3.5 ${
+                              star <= (complaint.feedback?.rating || 0)
+                                ? 'text-amber-400 fill-amber-400'
+                                : 'text-slate-300 dark:text-slate-700'
+                            }`}
+                          />
+                        ))}
+                        <span className="font-bold text-amber-500 ml-1">
+                          {complaint.feedback?.rating} / 5
+                        </span>
+                      </div>
+                    </div>
+                    {complaint.feedback?.comments && (
+                      <span className="text-slate-500 italic truncate max-w-md">
+                        "{complaint.feedback.comments}"
+                      </span>
+                    )}
+                  </div>
+                )}
+
+                {/* Interactive Feedback Form if Resolved & Not yet rated */}
+                {isResolved && !hasFeedback && !isJustSubmitted && (
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    {!isFormOpen ? (
+                      <button
+                        type="button"
+                        onClick={() => openFeedbackForm(complaint.id)}
+                        className="px-3.5 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-700 dark:text-amber-400 text-xs font-bold rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
+                      >
+                        <Star className="w-3.5 h-3.5" />
+                        <span>{t.citizenHistory.rateResolutionTitle}</span>
+                      </button>
+                    ) : (
+                      <div className="p-4 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-3">
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                            {t.citizenHistory.rateResolutionTitle}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={closeFeedbackForm}
+                            className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                          >
+                            {t.cancel}
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {[1, 2, 3, 4, 5].map((star) => (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setRating(star)}
+                              onMouseEnter={() => setHoverRating(star)}
+                              onMouseLeave={() => setHoverRating(0)}
+                              className="p-1 focus:outline-none cursor-pointer"
+                            >
+                              <Star
+                                className={`w-5 h-5 transition-all ${
+                                  star <= (hoverRating || rating)
+                                    ? 'text-amber-400 fill-amber-400 scale-110'
+                                    : 'text-slate-300 dark:text-slate-700 hover:text-amber-300'
+                                }`}
+                              />
+                            </button>
+                          ))}
+                          {rating > 0 && (
+                            <span className="text-xs font-bold text-amber-500 ml-2">
+                              {rating} / 5
+                            </span>
+                          )}
+                        </div>
+
+                        <textarea
+                          rows={2}
+                          value={comment}
+                          onChange={(e) => setComment(e.target.value)}
+                          placeholder={t.citizenHistory.commentsPlaceholder}
+                          className="w-full bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 rounded-xl p-2.5 text-xs text-slate-900 dark:text-white focus:outline-none focus:border-cyan-500 resize-none"
+                        />
+
+                        {feedbackError && (
+                          <p className="text-xs text-red-500 font-semibold">⚠️ {feedbackError}</p>
+                        )}
+
+                        <button
+                          type="button"
+                          disabled={submittingFeedback}
+                          onClick={() => handleSubmitFeedback(complaint.id)}
+                          className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 dark:bg-neonCyan dark:hover:bg-cyan-400 disabled:opacity-50 text-white dark:text-slate-950 text-xs font-bold rounded-xl transition-all cursor-pointer"
+                        >
+                          {submittingFeedback ? t.citizenHistory.submittingFeedback : t.citizenHistory.submitFeedbackBtn}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* Lightbox Image Preview Modal */}
+      {previewImage && (
+        <div 
+          onClick={() => setPreviewImage(null)}
+          className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md cursor-zoom-out animate-in fade-in duration-200"
+        >
+          <div className="relative max-w-2xl max-h-[85vh] rounded-2xl overflow-hidden shadow-2xl border border-slate-800">
+            <img src={previewImage} alt="Enlarged Evidence" className="w-full h-full object-contain" />
+            <button
+              type="button"
+              onClick={() => setPreviewImage(null)}
+              className="absolute top-3 right-3 p-2 bg-slate-900/80 text-white rounded-full hover:bg-slate-800 border border-slate-700 transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          </div>
         </div>
       )}
     </div>

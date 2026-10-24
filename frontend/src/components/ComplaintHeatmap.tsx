@@ -1,5 +1,6 @@
 import { useEffect, useRef, useMemo, useState } from 'react';
 import { MapPin, Layers, Info } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Complaint {
   id: string;
@@ -26,24 +27,27 @@ const DEPT_COLORS: Record<string, string> = {
   ELECTRICAL: '#eab308',
   DRAINAGE: '#8b5cf6',
   TRAFFIC: '#ef4444',
+  OTHER: '#64748b',
   GENERAL: '#6b7280',
 };
 
-const DEPT_LABELS: Record<string, string> = {
-  ALL: 'All Departments',
-  ROAD: 'Roads & Streets',
-  SANITATION: 'Waste & Sanitation',
-  WATER_SUPPLY: 'Water Supply',
-  ELECTRICAL: 'Power & Lighting',
-  DRAINAGE: 'Drainage',
-  TRAFFIC: 'Traffic & Signals',
-};
-
 export default function ComplaintHeatmap({ complaints }: ComplaintHeatmapProps) {
+  const { t, formatNumber } = useLanguage();
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
   const heatLayerRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
+
+  const DEPT_LABELS: Record<string, string> = {
+    ALL: t.departments.ALL,
+    ROAD: t.departments.ROAD,
+    SANITATION: t.departments.SANITATION,
+    WATER_SUPPLY: t.departments.WATER_SUPPLY,
+    ELECTRICAL: t.departments.ELECTRICAL,
+    DRAINAGE: t.departments.DRAINAGE,
+    TRAFFIC: t.departments.TRAFFIC,
+    OTHER: t.departments.OTHER,
+  };
 
   const [deptFilter, setDeptFilter] = useState('ALL');
   const [mapError, setMapError] = useState(false);
@@ -293,7 +297,7 @@ export default function ComplaintHeatmap({ complaints }: ComplaintHeatmapProps) 
     updateMap();
   }, [mapReady, filteredComplaints, heatEnabled]);
 
-  const departments = ['ALL', 'ROAD', 'SANITATION', 'WATER_SUPPLY', 'ELECTRICAL', 'DRAINAGE', 'TRAFFIC'];
+  const departments = ['ALL', 'ROAD', 'SANITATION', 'WATER_SUPPLY', 'ELECTRICAL', 'DRAINAGE'];
 
   if (mapError) {
     return (
@@ -315,11 +319,11 @@ export default function ComplaintHeatmap({ complaints }: ComplaintHeatmapProps) 
           </div>
           <div>
             <h2 className="text-sm font-bold text-slate-800 dark:text-white uppercase tracking-wide flex items-center gap-2">
-              Complaint Heatmap
+              {t.heatmap.title}
             </h2>
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {stats.total} complaint{stats.total !== 1 ? 's' : ''} plotted
-              {deptFilter !== 'ALL' ? ` for ${DEPT_LABELS[deptFilter] || deptFilter}` : ' city-wide'}
+              {formatNumber(stats.total)} {t.heatmap.subtitle}
+              {deptFilter !== 'ALL' ? ` (${DEPT_LABELS[deptFilter] || deptFilter})` : ''}
             </p>
           </div>
         </div>
@@ -340,7 +344,7 @@ export default function ComplaintHeatmap({ complaints }: ComplaintHeatmapProps) 
                 heatEnabled ? 'translate-x-4' : ''
               }`} />
             </div>
-            Heatmap
+            {t.heatmap.title}
           </label>
 
           {/* Department Filter */}

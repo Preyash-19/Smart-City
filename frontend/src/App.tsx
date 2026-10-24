@@ -1,5 +1,6 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import Login from './components/Login';
+import ActivateAccount from './pages/auth/ActivateAccount';
 import ProtectedRoute from './components/ProtectedRoute';
 import PwaUpdatePrompt from './components/PwaUpdatePrompt';
 
@@ -22,8 +23,12 @@ function App() {
           {/* Public Introduction / Landing Route */}
           <Route path="/" element={<IntroductionPage />} />
           
-          {/* Public Auth Route */}
+          {/* Public Auth Routes */}
           <Route path="/login" element={<Login />} />
+          <Route path="/login/citizen" element={<Login />} />
+          <Route path="/login/officer" element={<Login />} />
+          <Route path="/login/city-admin" element={<Login />} />
+          <Route path="/activate" element={<ActivateAccount />} />
           
           {/* Citizen Portal Routes (Protected) */}
           <Route 

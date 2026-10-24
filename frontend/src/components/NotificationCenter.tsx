@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { apiClient } from '../services/api';
 import { Bell, CheckCheck, Clock, ShieldAlert } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export interface NotificationItem {
   id: string;
@@ -15,6 +16,7 @@ export interface NotificationItem {
 }
 
 export default function NotificationCenter() {
+  const { t } = useLanguage();
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -27,7 +29,7 @@ export default function NotificationCenter() {
 
     try {
       setIsLoading(true);
-      const res = await axios.get('http://localhost:5000/api/notifications', {
+      const res = await apiClient.get('/notifications', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(res.data);
@@ -60,7 +62,7 @@ export default function NotificationCenter() {
     if (!token) return;
 
     try {
-      await axios.put('http://localhost:5000/api/notifications/read-all', {}, {
+      await apiClient.put('/notifications/read-all', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
@@ -74,7 +76,7 @@ export default function NotificationCenter() {
 
     if (!notif.isRead && token) {
       try {
-        await axios.put(`http://localhost:5000/api/notifications/${notif.id}/read`, {}, {
+        await apiClient.put(`/notifications/${notif.id}/read`, {}, {
           headers: { Authorization: `Bearer ${token}` }
         });
         setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, isRead: true } : n));
@@ -128,10 +130,10 @@ export default function NotificationCenter() {
           <div className="p-4 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/60">
             <div className="flex items-center gap-2">
               <Bell className="w-4 h-4 text-cyan-600 dark:text-neonCyan" />
-              <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">Notifications</h3>
+              <h3 className="text-sm font-bold text-slate-900 dark:text-white tracking-wide">{t.notifications.title}</h3>
               {unreadCount > 0 && (
                 <span className="px-2 py-0.5 text-[10px] font-extrabold rounded-full bg-cyan-500/10 text-cyan-600 dark:text-neonCyan border border-cyan-500/30">
-                  {unreadCount} unread
+                  {unreadCount} {t.notifications.newBadge}
                 </span>
               )}
             </div>
@@ -141,19 +143,18 @@ export default function NotificationCenter() {
                 className="text-xs text-slate-500 dark:text-slate-400 hover:text-cyan-600 dark:hover:text-neonCyan flex items-center gap-1 transition-colors font-semibold"
               >
                 <CheckCheck className="w-3.5 h-3.5" />
-                Mark all as read
+                {t.notifications.markAllRead}
               </button>
             )}
           </div>
 
           <div className="max-h-80 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-800/60">
             {isLoading && notifications.length === 0 ? (
-              <div className="p-6 text-center text-slate-500 dark:text-slate-400 text-xs font-medium">Loading notifications...</div>
+              <div className="p-6 text-center text-slate-500 dark:text-slate-400 text-xs font-medium">{t.loading}</div>
             ) : notifications.length === 0 ? (
               <div className="p-8 text-center flex flex-col items-center gap-2">
                 <ShieldAlert className="w-8 h-8 text-slate-400 dark:text-slate-600" />
-                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">No notifications yet</span>
-                <span className="text-xs text-slate-400 dark:text-slate-500">Updates regarding your complaints will appear here.</span>
+                <span className="text-sm font-semibold text-slate-600 dark:text-slate-400">{t.notifications.empty}</span>
               </div>
             ) : (
               notifications.map((notif) => (

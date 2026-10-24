@@ -20,10 +20,18 @@ import {
   Sparkles
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import AdministrativeLocationModal from '../components/AdministrativeLocationModal';
+import { useLanguage } from '../context/LanguageContext';
+import type { LocationSelection } from '../data/mockLocationData';
 
 export default function IntroductionPage() {
   const navigate = useNavigate();
+  const { language, setLanguage, t } = useLanguage();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  // Administrative location modal state for Officer and City Admin flows
+  const [isLocationModalOpen, setIsLocationModalOpen] = useState(false);
+  const [modalTargetRole, setModalTargetRole] = useState<'OFFICER' | 'ADMIN' | null>(null);
 
   const scrollToSection = (id: string) => {
     setMobileMenuOpen(false);
@@ -33,10 +41,36 @@ export default function IntroductionPage() {
     }
   };
 
+  const handleCitizenCardClick = () => {
+    // Citizen card navigates directly to Citizen Login without location selector modal
+    navigate('/login/citizen');
+  };
+
+  const handleOfficerCardClick = () => {
+    // Officer card opens location selection modal
+    setModalTargetRole('OFFICER');
+    setIsLocationModalOpen(true);
+  };
+
+  const handleAdminCardClick = () => {
+    // City Admin card opens location selection modal
+    setModalTargetRole('ADMIN');
+    setIsLocationModalOpen(true);
+  };
+
+  const handleLocationConfirmed = (location: LocationSelection, role: 'OFFICER' | 'ADMIN') => {
+    setIsLocationModalOpen(false);
+    if (role === 'OFFICER') {
+      navigate('/login/officer', { state: { location, role: 'OFFICER' } });
+    } else {
+      navigate('/login/city-admin', { state: { location, role: 'ADMIN' } });
+    }
+  };
+
   return (
     <div className="w-full max-w-6xl mx-auto flex flex-col items-center px-4 sm:px-6 py-4 transition-colors">
       
-      {/* ── 1. Minimal Navigation Header ── */}
+      {/* ── 1. Navigation Header ── */}
       <header className="w-full bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border border-slate-200 dark:border-slate-800 rounded-2xl px-4 sm:px-6 py-3.5 mb-8 sm:mb-12 shadow-sm dark:shadow-xl flex justify-between items-center sticky top-4 z-40 transition-colors">
         {/* Brand */}
         <div className="flex items-center gap-3 cursor-pointer" onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}>
@@ -48,7 +82,7 @@ export default function IntroductionPage() {
               Smart<span className="text-cyan-600 dark:text-neonCyan">City</span>
             </span>
             <span className="hidden sm:inline-block ml-2 text-[10px] uppercase font-bold tracking-wider px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400">
-              Civic Platform
+              {t.brandTagline}
             </span>
           </div>
         </div>
@@ -59,31 +93,68 @@ export default function IntroductionPage() {
             onClick={() => scrollToSection('how-it-works')} 
             className="hover:text-cyan-600 dark:hover:text-neonCyan transition-colors cursor-pointer"
           >
-            How It Works
+            {t.landing.howItWorksTitle}
           </button>
           <button 
             onClick={() => scrollToSection('categories')} 
             className="hover:text-cyan-600 dark:hover:text-neonCyan transition-colors cursor-pointer"
           >
-            What to Report
+            {t.landing.categoriesTitle}
           </button>
           <button 
             onClick={() => scrollToSection('roles')} 
             className="hover:text-cyan-600 dark:hover:text-neonCyan transition-colors cursor-pointer"
           >
-            Three Roles
+            {t.landing.rolesTitle}
           </button>
         </nav>
 
         {/* Header Right Actions */}
         <div className="flex items-center gap-2 sm:gap-3">
+          {/* Language Switcher */}
+          <div className="flex items-center gap-0.5 p-0.5 bg-slate-100 dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => setLanguage('en')}
+              className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
+                language === 'en'
+                  ? 'bg-cyan-600 text-white dark:bg-neonCyan dark:text-slate-950 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              EN
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('hi')}
+              className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
+                language === 'hi'
+                  ? 'bg-cyan-600 text-white dark:bg-neonCyan dark:text-slate-950 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              हिन्दी
+            </button>
+            <button
+              type="button"
+              onClick={() => setLanguage('mr')}
+              className={`px-2 py-1 text-xs font-bold rounded-lg transition-all ${
+                language === 'mr'
+                  ? 'bg-cyan-600 text-white dark:bg-neonCyan dark:text-slate-950 shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
+              }`}
+            >
+              मराठी
+            </button>
+          </div>
+
           <ThemeToggle />
 
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => scrollToSection('roles')}
             className="hidden sm:inline-flex items-center gap-1.5 px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-bold text-xs sm:text-sm rounded-xl shadow-md hover:shadow-cyan-500/20 transition-all cursor-pointer"
           >
-            <span>Get Started</span>
+            <span>{t.landing.getStartedBtn}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
 
@@ -105,25 +176,25 @@ export default function IntroductionPage() {
             onClick={() => scrollToSection('how-it-works')}
             className="text-left text-sm font-semibold p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
           >
-            How It Works
+            {t.landing.howItWorksTitle}
           </button>
           <button 
             onClick={() => scrollToSection('categories')}
             className="text-left text-sm font-semibold p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
           >
-            What to Report
+            {t.landing.categoriesTitle}
           </button>
           <button 
             onClick={() => scrollToSection('roles')}
             className="text-left text-sm font-semibold p-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200"
           >
-            Three Roles
+            {t.landing.rolesTitle}
           </button>
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => scrollToSection('roles')}
             className="w-full flex items-center justify-center gap-2 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-bold text-sm rounded-xl shadow-md"
           >
-            <span>Get Started</span>
+            <span>{t.landing.getStartedBtn}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -134,29 +205,27 @@ export default function IntroductionPage() {
         <div className="flex-1 text-center lg:text-left">
           <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-cyan-500/10 border border-cyan-500/30 rounded-full text-cyan-700 dark:text-neonCyan text-xs font-bold uppercase tracking-wider mb-5">
             <ShieldCheck className="w-3.5 h-3.5" />
-            Civic Governance Platform
+            {t.landing.heroBadge}
           </div>
 
           <h1 className="text-4xl sm:text-5xl lg:text-6xl font-black text-slate-900 dark:text-white tracking-tight leading-[1.1] mb-6">
-            Smart City
+            {t.landing.heroTitle}
           </h1>
 
           <p className="text-xl sm:text-2xl font-bold text-slate-800 dark:text-slate-100 mb-4 leading-snug">
-            Report civic problems. <br className="hidden sm:inline" />
-            Track progress. <br className="hidden sm:inline" />
-            Build a better city.
+            {t.landing.heroSubtitle}
           </p>
 
           <p className="text-sm sm:text-base text-slate-600 dark:text-slate-300 max-w-xl mb-8 leading-relaxed">
-            Smart City makes it simple for citizens to report local problems, while helping departments and city administrators manage and resolve them efficiently.
+            {t.landing.heroDescription}
           </p>
 
           <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
             <button
-              onClick={() => navigate('/login')}
+              onClick={() => scrollToSection('roles')}
               className="w-full sm:w-auto px-7 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm sm:text-base rounded-xl shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Get Started</span>
+              <span>{t.landing.getStartedBtn}</span>
               <ArrowRight className="w-4 h-4" />
             </button>
 
@@ -164,7 +233,7 @@ export default function IntroductionPage() {
               onClick={() => scrollToSection('how-it-works')}
               className="w-full sm:w-auto px-6 py-3.5 bg-white dark:bg-slate-900 hover:bg-slate-50 dark:hover:bg-slate-800/80 text-slate-700 dark:text-slate-200 font-bold text-sm sm:text-base rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
             >
-              <span>Explore How It Works</span>
+              <span>{t.landing.exploreProcessBtn}</span>
               <span className="text-cyan-600 dark:text-neonCyan">↓</span>
             </button>
           </div>
@@ -175,16 +244,20 @@ export default function IntroductionPage() {
           <div className="flex items-center justify-between pb-4 border-b border-slate-100 dark:border-slate-800 mb-4">
             <div className="flex items-center gap-2.5">
               <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">Live Complaint Example</span>
+              <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                {t.landing.liveExampleTitle}
+              </span>
             </div>
             <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-400 border border-amber-500/20">
-              IN PROGRESS
+              {t.landing.liveExampleStatus}
             </span>
           </div>
 
           <div className="space-y-3">
             <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">ROAD DEPARTMENT</span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">
+                {t.departments.ROAD}
+              </span>
               <h4 className="text-base font-bold text-slate-900 dark:text-white">Dangerous pothole on 5th Cross Road</h4>
               <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 line-clamp-2">
                 Deep pothole near the bus stop causing traffic slowdown and vehicle hazard during rains.
@@ -213,12 +286,14 @@ export default function IntroductionPage() {
       {/* ── 3. How It Works Section ── */}
       <section id="how-it-works" className="w-full py-10 sm:py-14 border-t border-slate-200 dark:border-slate-800">
         <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
-          <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">Simple 5-Step Process</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">
+            {t.landing.howItWorksBadge}
+          </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
-            How It Works
+            {t.landing.howItWorksTitle}
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-2">
-            From reporting an issue to city verification, every step is clear and transparent.
+            {t.landing.howItWorksSubtitle}
           </p>
         </div>
 
@@ -295,70 +370,74 @@ export default function IntroductionPage() {
         </div>
       </section>
 
-      {/* ── 4. What You Can Report Section ── */}
+      {/* ── 4. Supported Municipal Categories (5 Departments Only) ── */}
       <section id="categories" className="w-full py-10 sm:py-14 border-t border-slate-200 dark:border-slate-800">
         <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
-          <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">Supported Municipal Categories</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">
+            {t.landing.categoriesBadge}
+          </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
-            What can you report?
+            {t.landing.categoriesTitle}
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-2">
-            Submit issues directly to any of the six major civic departments.
+            {t.landing.categoriesSubtitle}
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-          {/* Category 1 */}
-          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
+        {/* Five Supported Municipal Categories */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 sm:gap-5">
+          {/* Category 1: ROAD */}
+          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:border-cyan-500/40 hover:shadow-md transition-all">
             <div className="text-3xl mb-3">🛣️</div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Roads & Potholes</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">
+              {t.departments.ROAD}
+            </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Report potholes, damaged roads and related road problems.
+              Report potholes, damaged asphalt, and road surface hazards.
             </p>
           </div>
 
-          {/* Category 2 */}
-          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
+          {/* Category 2: SANITATION */}
+          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:border-amber-500/40 hover:shadow-md transition-all">
             <div className="text-3xl mb-3">🗑️</div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Garbage & Sanitation</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">
+              {t.departments.SANITATION}
+            </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Report overflow, waste accumulation, and cleanliness issues.
+              Report garbage overflow, dump sites, and waste accumulation.
             </p>
           </div>
 
-          {/* Category 3 */}
-          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
+          {/* Category 3: WATER_SUPPLY */}
+          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:border-blue-500/40 hover:shadow-md transition-all">
             <div className="text-3xl mb-3">💧</div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Water Supply</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">
+              {t.departments.WATER_SUPPLY}
+            </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Report water leakages, supply shortages, or pipeline damage.
+              Report pipe bursts, clean water leakages, and supply shortages.
             </p>
           </div>
 
-          {/* Category 4 */}
-          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
+          {/* Category 4: ELECTRICAL */}
+          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:border-yellow-500/40 hover:shadow-md transition-all">
             <div className="text-3xl mb-3">💡</div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Electrical Issues</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">
+              {t.departments.ELECTRICAL}
+            </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Report streetlights, faulty wiring, and power disruptions.
+              Report broken streetlights, dangling wires, and open junction boxes.
             </p>
           </div>
 
-          {/* Category 5 */}
-          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
+          {/* Category 5: DRAINAGE */}
+          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:border-purple-500/40 hover:shadow-md transition-all">
             <div className="text-3xl mb-3">🚰</div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Drainage</h3>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">
+              {t.departments.DRAINAGE}
+            </h3>
             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Report blocked gutters, open drains, and sewage overflow.
-            </p>
-          </div>
-
-          {/* Category 6 */}
-          <div className="p-5 sm:p-6 bg-white dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-sm hover:shadow-md transition-all">
-            <div className="text-3xl mb-3">🚦</div>
-            <h3 className="text-base font-bold text-slate-900 dark:text-white mb-1.5">Traffic</h3>
-            <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
-              Report broken traffic signals, congestion hazards, and signage issues.
+              Report blocked storm drains, sewage overflows, and open gutters.
             </p>
           </div>
         </div>
@@ -385,94 +464,171 @@ export default function IntroductionPage() {
             <div className="p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center shadow-sm">
               <FileText className="w-6 h-6 text-cyan-600 dark:text-neonCyan mx-auto mb-2" />
               <h4 className="text-xs font-bold text-slate-900 dark:text-white">Your Complaint</h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Submitted with details & location</p>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Submitted with photo & GPS</p>
             </div>
 
             <div className="p-4 bg-white dark:bg-slate-950 border border-cyan-300 dark:border-cyan-500/40 rounded-2xl text-center shadow-sm">
               <BrainCircuit className="w-6 h-6 text-purple-600 dark:text-purple-400 mx-auto mb-2 animate-pulse" />
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white">AI Analysis</h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Automated category understanding</p>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-white">AI Vision Analysis</h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Real pixel defect recognition</p>
             </div>
 
             <div className="p-4 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-center shadow-sm">
               <Building2 className="w-6 h-6 text-blue-600 dark:text-blue-400 mx-auto mb-2" />
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white">Department + Priority</h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Instant official routing</p>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-white">Department + Severity</h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Calibrated municipal triage</p>
             </div>
 
             <div className="p-4 bg-white dark:bg-slate-950 border border-emerald-300 dark:border-emerald-500/40 rounded-2xl text-center shadow-sm">
               <CheckCircle2 className="w-6 h-6 text-emerald-600 dark:text-emerald-400 mx-auto mb-2" />
-              <h4 className="text-xs font-bold text-slate-900 dark:text-white">Faster Action</h4>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Quick officer intervention</p>
+              <h4 className="text-xs font-bold text-slate-900 dark:text-white">Officer Action</h4>
+              <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Prompt jurisdictional dispatch</p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* ── 6. Three-Role Section ── */}
+      {/* ── 6. Three-Role Section (All Three Cards Fully Interactive) ── */}
       <section id="roles" className="w-full py-10 sm:py-14 border-t border-slate-200 dark:border-slate-800">
         <div className="text-center max-w-2xl mx-auto mb-10 sm:mb-12">
-          <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">Platform Access</span>
+          <span className="text-xs font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">
+            {t.landing.rolesBadge}
+          </span>
           <h2 className="text-2xl sm:text-3xl font-extrabold text-slate-900 dark:text-white mt-1">
-            One platform. Three roles.
+            {t.landing.rolesTitle}
           </h2>
           <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-2">
-            Tailored workspaces for citizens, department officers, and city leaders.
+            {t.landing.rolesSubtitle}
           </p>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Role 1: Citizen */}
-          <div className="p-6 bg-white dark:bg-slate-900/60 border border-cyan-200 dark:border-cyan-500/20 rounded-2xl shadow-sm flex flex-col justify-between">
+          {/* ────────────────────────────────────────────────────────── */}
+          {/* Role 1: Citizen Card (Direct Click to Citizen Login)      */}
+          {/* ────────────────────────────────────────────────────────── */}
+          <div 
+            id="role-card-citizen"
+            tabIndex={0}
+            role="button"
+            aria-label="Citizen Portal Login"
+            onClick={handleCitizenCardClick}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCitizenCardClick(); } }}
+            className="group relative p-6 bg-white dark:bg-slate-900/60 border border-cyan-200 dark:border-cyan-500/20 rounded-3xl shadow-sm hover:border-cyan-500 hover:shadow-cyan-500/15 hover:shadow-xl hover:-translate-y-1.5 transition-all duration-200 cursor-pointer flex flex-col justify-between text-left focus:outline-none focus:ring-2 focus:ring-cyan-500"
+          >
             <div>
-              <div className="p-3 w-fit rounded-xl bg-cyan-500/10 text-cyan-600 dark:text-neonCyan mb-4">
-                <User className="w-6 h-6" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 w-fit rounded-2xl bg-cyan-500/10 text-cyan-600 dark:text-neonCyan group-hover:scale-110 transition-transform duration-200">
+                  <User className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-cyan-50 dark:bg-cyan-950/60 text-cyan-700 dark:text-neonCyan border border-cyan-200 dark:border-cyan-800">
+                  {t.landing.roleCards.citizenBadge}
+                </span>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-cyan-600 dark:text-neonCyan">For Residents</span>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1 mb-2">Citizen</h3>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Report civic problems and track their progress in real time.
+
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 group-hover:text-cyan-600 dark:group-hover:text-neonCyan transition-colors">
+                {t.landing.roleCards.citizenTitle}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                {t.landing.roleCards.citizenDesc}
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600 dark:text-neonCyan" />
-              <span>Easy submission with GPS location</span>
+
+            <div>
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600 dark:text-neonCyan shrink-0" />
+                <span>{t.landing.roleCards.citizenFeature}</span>
+              </div>
+
+              <div className="mt-4 pt-3 flex items-center justify-between text-xs font-bold text-cyan-600 dark:text-neonCyan group-hover:translate-x-0.5 transition-transform">
+                <span>{t.landing.roleCards.citizenAction}</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </div>
             </div>
           </div>
 
-          {/* Role 2: Officer */}
-          <div className="p-6 bg-white dark:bg-slate-900/60 border border-amber-200 dark:border-amber-500/20 rounded-2xl shadow-sm flex flex-col justify-between">
+          {/* ────────────────────────────────────────────────────────── */}
+          {/* Role 2: Officer Card (Opens Location Selector Modal)       */}
+          {/* ────────────────────────────────────────────────────────── */}
+          <div 
+            id="role-card-officer"
+            tabIndex={0}
+            role="button"
+            aria-label="Department Officer Portal Login"
+            onClick={handleOfficerCardClick}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleOfficerCardClick(); } }}
+            className="group relative p-6 bg-white dark:bg-slate-900/60 border border-amber-200 dark:border-amber-500/20 rounded-3xl shadow-sm hover:border-amber-500 hover:shadow-amber-500/15 hover:shadow-xl hover:-translate-y-1.5 transition-all duration-200 cursor-pointer flex flex-col justify-between text-left focus:outline-none focus:ring-2 focus:ring-amber-500"
+          >
             <div>
-              <div className="p-3 w-fit rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 mb-4">
-                <Building2 className="w-6 h-6" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 w-fit rounded-2xl bg-amber-500/10 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform duration-200">
+                  <Building2 className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+                  {t.landing.roleCards.officerBadge}
+                </span>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">For Departments</span>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1 mb-2">Officer</h3>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Manage complaints assigned to your department and update their status.
+
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 group-hover:text-amber-600 dark:group-hover:text-amber-400 transition-colors">
+                {t.landing.roleCards.officerTitle}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                {t.landing.roleCards.officerDesc}
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
-              <span>Focused department workload queue</span>
+
+            <div>
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />
+                <span>{t.landing.roleCards.officerFeature}</span>
+              </div>
+
+              <div className="mt-4 pt-3 flex items-center justify-between text-xs font-bold text-amber-600 dark:text-amber-400 group-hover:translate-x-0.5 transition-transform">
+                <span>{t.landing.roleCards.officerAction}</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </div>
             </div>
           </div>
 
-          {/* Role 3: City Admin */}
-          <div className="p-6 bg-white dark:bg-slate-900/60 border border-purple-200 dark:border-purple-500/20 rounded-2xl shadow-sm flex flex-col justify-between">
+          {/* ────────────────────────────────────────────────────────── */}
+          {/* Role 3: City Admin Card (Opens Location Selector Modal)   */}
+          {/* ────────────────────────────────────────────────────────── */}
+          <div 
+            id="role-card-admin"
+            tabIndex={0}
+            role="button"
+            aria-label="City Administrator Command Portal Login"
+            onClick={handleAdminCardClick}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleAdminCardClick(); } }}
+            className="group relative p-6 bg-white dark:bg-slate-900/60 border border-purple-200 dark:border-purple-500/20 rounded-3xl shadow-sm hover:border-purple-500 hover:shadow-purple-500/15 hover:shadow-xl hover:-translate-y-1.5 transition-all duration-200 cursor-pointer flex flex-col justify-between text-left focus:outline-none focus:ring-2 focus:ring-purple-500"
+          >
             <div>
-              <div className="p-3 w-fit rounded-xl bg-purple-500/10 text-purple-600 dark:text-purple-400 mb-4">
-                <Users className="w-6 h-6" />
+              <div className="flex items-center justify-between mb-4">
+                <div className="p-3 w-fit rounded-2xl bg-purple-500/10 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform duration-200">
+                  <Users className="w-6 h-6" />
+                </div>
+                <span className="text-[10px] font-extrabold uppercase tracking-wider px-2.5 py-1 rounded-full bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 border border-purple-200 dark:border-purple-800">
+                  {t.landing.roleCards.adminBadge}
+                </span>
               </div>
-              <span className="text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">For City Leadership</span>
-              <h3 className="text-lg font-bold text-slate-900 dark:text-white mt-1 mb-2">City Admin</h3>
-              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed">
-                Monitor city-wide complaints and understand where problems are concentrated.
+
+              <h3 className="text-xl font-black text-slate-900 dark:text-white mb-2 group-hover:text-purple-600 dark:group-hover:text-purple-400 transition-colors">
+                {t.landing.roleCards.adminTitle}
+              </h3>
+              <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 leading-relaxed mb-4">
+                {t.landing.roleCards.adminDesc}
               </p>
             </div>
-            <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
-              <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400" />
-              <span>City-wide analytics & heatmap</span>
+
+            <div>
+              <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-purple-600 dark:text-purple-400 shrink-0" />
+                <span>{t.landing.roleCards.adminFeature}</span>
+              </div>
+
+              <div className="mt-4 pt-3 flex items-center justify-between text-xs font-bold text-purple-600 dark:text-purple-400 group-hover:translate-x-0.5 transition-transform">
+                <span>{t.landing.roleCards.adminAction}</span>
+                <ChevronRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
+              </div>
             </div>
           </div>
         </div>
@@ -486,18 +642,20 @@ export default function IntroductionPage() {
               <Bell className="w-6 h-6" />
             </div>
             <div>
-              <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">Stay informed</h3>
+              <h3 className="text-lg sm:text-xl font-bold text-slate-900 dark:text-white">
+                {t.landing.stayInformedTitle}
+              </h3>
               <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1 max-w-xl leading-relaxed">
-                Once you report a problem, you can follow its progress from submission to resolution. Receive updates when your complaint status changes.
+                {t.landing.stayInformedDesc}
               </p>
             </div>
           </div>
 
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => scrollToSection('roles')}
             className="w-full md:w-auto px-5 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-slate-100 font-bold text-xs sm:text-sm rounded-xl border border-slate-200 dark:border-slate-700 transition-all flex items-center justify-center gap-2 shrink-0 cursor-pointer"
           >
-            <span>View Portal</span>
+            <span>{t.landing.viewPortalBtn}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>
@@ -506,17 +664,17 @@ export default function IntroductionPage() {
       {/* ── 8. Final Call to Action ── */}
       <section className="w-full py-12 sm:py-16 my-6 text-center bg-gradient-to-r from-cyan-600/10 via-blue-600/10 to-indigo-600/10 dark:from-slate-900 dark:to-slate-950 border border-cyan-500/20 dark:border-slate-800 rounded-3xl p-8 sm:p-12">
         <h2 className="text-2xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tight">
-          Have a civic problem to report?
+          {t.landing.finalCtaTitle}
         </h2>
         <p className="text-xs sm:text-base text-slate-600 dark:text-slate-300 mt-3 max-w-lg mx-auto">
-          Help make your city cleaner, safer and better connected.
+          {t.landing.finalCtaSubtitle}
         </p>
         <div className="mt-6 flex justify-center">
           <button
-            onClick={() => navigate('/login')}
+            onClick={() => scrollToSection('roles')}
             className="px-8 py-3.5 bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-400 hover:to-blue-500 text-white font-extrabold text-sm sm:text-base rounded-xl shadow-lg hover:shadow-cyan-500/25 transition-all flex items-center gap-2 cursor-pointer"
           >
-            <span>Get Started</span>
+            <span>{t.landing.getStartedBtn}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -531,10 +689,17 @@ export default function IntroductionPage() {
           Report • Track • Resolve
         </p>
         <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-2">
-          © Smart City
+          © Smart City AI
         </p>
       </footer>
 
+      {/* Administrative Location Modal */}
+      <AdministrativeLocationModal
+        isOpen={isLocationModalOpen}
+        targetRole={modalTargetRole}
+        onClose={() => setIsLocationModalOpen(false)}
+        onConfirm={handleLocationConfirmed}
+      />
     </div>
   );
 }
